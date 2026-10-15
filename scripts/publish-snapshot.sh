@@ -148,14 +148,17 @@ git -C "$publish" -c user.name="snapshot publisher" -c user.email="snapshot-publ
 # Skip when this commit is no longer the branch head.
 if [[ "$SOURCE_REF" == refs/heads/* ]]; then
   remote_url=$(git -C "$SOURCE_DIR" remote get-url origin)
-  ls_args=()
+  ls_args=(-c credential.helper=)
   if [[ "$remote_url" == https://* ]]; then
     if [[ -z "${GITHUB_TOKEN:-}" ]]; then
       fail "status=source-head-unknown"
     fi
-    ls_args=(-c "http.https://github.com/.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}")
+    # Basic auth header, not a credential in the URL. An empty helper stops
+    # the runner from prompting when persist-credentials is false.
+    basic=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w 0)
+    ls_args+=(-c "http.extraheader=AUTHORIZATION: basic ${basic}")
   fi
-  current=$(git -C "$SOURCE_DIR" "${ls_args[@]}" ls-remote origin "$SOURCE_REF" | awk 'NR==1 {print $1}')
+  current=$(GIT_TERMINAL_PROMPT=0 git -C "$SOURCE_DIR" "${ls_args[@]}" ls-remote origin "$SOURCE_REF" | awk 'NR==1 {print $1}')
   if [[ -z "$current" ]]; then
     fail "status=source-head-unknown"
   fi
