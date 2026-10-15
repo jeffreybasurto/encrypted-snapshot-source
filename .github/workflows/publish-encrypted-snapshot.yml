@@ -1,0 +1,84 @@
+name: Publish encrypted snapshot
+
+on:
+  workflow_call:
+    inputs:
+      destination_repository:
+        description: Destination repository (owner/name)
+        required: true
+        type: string
+      destination_branch:
+        description: Destination branch to replace with one parentless commit
+        required: true
+        type: string
+      age_recipient:
+        description: age public recipient (age1...)
+        required: true
+        type: string
+      public_ci_template:
+        description: Path in the source repo of the public CI workflow template
+        required: true
+        type: string
+    secrets:
+      destination_deploy_key:
+        description: Write-enabled SSH deploy key for the destination repository
+        required: true
+
+concurrency:
+  group: publish-${{ inputs.destination_repository }}-${{ inputs.destination_branch }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install age
+        run: |
+          set +x
+          sudo apt-get update
+          sudo apt-get install -y age
+
+      - name: Load publisher scripts
+        env:
+          JOB_WORKFLOW_REF: ${{ job.workflow_ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          set -euo pipefail
+          ref="${JOB_WORKFLOW_REF##*@}"
+          repo_path="${JOB_WORKFLOW_REF%@*}"
+          owner_repo="${repo_path%%/.github/workflows/*}"
+          encoded_ref=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$ref")
+          dest="${RUNNER_TEMP}/publisher-scripts"
+          mkdir -p "$dest"
+          for file in publish-snapshot.sh run-public-ci.sh; do
+            curl -fsSL \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.raw" \
+              "https://api.github.com/repos/${owner_repo}/contents/scripts/${file}?ref=${encoded_ref}" \
+              -o "${dest}/${file}"
+          done
+          chmod 755 "${dest}/publish-snapshot.sh" "${dest}/run-public-ci.sh"
+
+      - name: Publish snapshot
+        env:
+          DEST_REPO: ${{ inputs.destination_repository }}
+          DEST_BRANCH: ${{ inputs.destination_branch }}
+          AGE_RECIPIENT: ${{ inputs.age_recipient }}
+          PUBLIC_CI_TEMPLATE: ${{ inputs.public_ci_template }}
+          DEPLOY_KEY: ${{ secrets.destination_deploy_key }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          bash "${RUNNER_TEMP}/publisher-scripts/publish-snapshot.sh"

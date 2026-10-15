@@ -1,0 +1,21 @@
+name: Publish snapshot
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-encrypted-snapshot.yml
+    with:
+      destination_repository: OWNER/DESTINATION_REPO
+      destination_branch: snapshot
+      age_recipient: AGE_PUBLIC_KEY
+      public_ci_template: templates/public-ci.yml
+    secrets:
+      destination_deploy_key: ${{ secrets.DEST_DEPLOY_KEY }}

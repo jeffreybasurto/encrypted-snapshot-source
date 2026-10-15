@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - snapshot
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install age
+        run: |
+          set +x
+          sudo apt-get update
+          sudo apt-get install -y age
+
+      - name: Decrypt and run CI
+        env:
+          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
+        run: |
+          set +x
+          bash scripts/run-public-ci.sh
