@@ -13,9 +13,9 @@ jobs:
   publish:
     uses: ./.github/workflows/publish-encrypted-snapshot.yml
     with:
-      destination_repository: OWNER/DESTINATION_REPO
+      destination_repository: jeffreybasurto/encrypted-snapshot-public
       destination_branch: snapshot
-      age_recipient: AGE_PUBLIC_KEY
+      age_recipient: age1caqkqf5k0z4k0e0vvwnje6pxv40sw3hr9jcgecvae3ayadeyfp7sfra7kx
       public_ci_template: templates/public-ci.yml
     secrets:
       destination_deploy_key: ${{ secrets.DEST_DEPLOY_KEY }}
